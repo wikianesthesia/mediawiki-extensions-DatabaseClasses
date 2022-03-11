@@ -77,17 +77,33 @@ abstract class DatabaseClass extends DatabaseMetaClass {
 
         $cache = MediaWikiServices::getInstance()->getMainWANObjectCache();
 
+        /*
+         * We should not use the cache in the following circumstances:
+         * - The cache is disabled using the config variable
+         * - There is more than one condition (can't be properly managed by save/delete)
+         * - Any options are defined
+         * - Any condition is not a simple key/value pair (will be set when processing conditions)
+         * - The cache key has been deleted during this connection (will be set after key is defined)
+         */
+        $noCache = $wgDatabaseClassesDisableCache || count( $conds ) > 1 || count( $options );
+
         if( empty( $conds ) ) {
             $key = $cache->makeKey( static::class, 'all' );
         } else {
             ksort( $conds );
 
             foreach( $conds as $fieldName => $conditionValue ) {
-                static::validateDatabaseFieldName( $fieldName );
+                if( is_string( $fieldName ) ) {
+                    static::validateDatabaseFieldName( $fieldName );
+                } else {
+                    $noCache = true;
+                }
             }
 
             $key = static::makeCacheKeyFromValues( $conds );
         }
+
+        $noCache = $noCache || in_array( $key, static::$deletedCacheKeys );
 
         $callback = function( $oldValue, &$ttl, array &$setOpts ) use ( $conds, $options ) {
             $dbr = wfGetDB( DB_REPLICA );
@@ -106,8 +122,10 @@ abstract class DatabaseClass extends DatabaseMetaClass {
 
             if( $tablePrefix && !empty( $conds ) ) {
                 foreach( $conds as $fieldName => $conditionalValue ) {
-                    $conds[ $tablePrefix . $fieldName ] = $conditionalValue;
-                    unset( $conds[ $fieldName ] );
+                    if( is_string( $fieldName ) ) {
+                        $conds[ $tablePrefix . $fieldName ] = $conditionalValue;
+                        unset( $conds[ $fieldName ] );
+                    }
                 }
             }
 
@@ -149,24 +167,15 @@ abstract class DatabaseClass extends DatabaseMetaClass {
                 }
             }
 
-            # If there is more than one condition or any options specified,
-            # we don't want actually cache this value
-            if( count( $conds ) > 1 || count( $options ) ) {
-                $ttl = WANObjectCache::TTL_SECOND;
-            }
-
             return $ids;
         };
 
-        if( $wgDatabaseClassesDisableCache
-            || in_array( $key, static::$deletedCacheKeys )
-            || count( $conds ) > 1
-            || count( $options ) ) {
+        if( $noCache ) {
             # If caching is disabled, just check the database directly.
             # Similarly, if the cache key corresponding to this query was deleted during this connection,
             # we are at risk of getting a stale value due to some possible race conditions and interactions with
             # tombstoning of deleted keys. Similarly, we'll just check the database directly.
-            # TODO We also should never use the cache for requests with more than one condition since those cache keys
+            # We also should never use the cache for requests with more than one condition since those cache keys
             # cannot be properly managed yet.
 
             # If caching is temporarily disabled, it may be optimal to delete any keys that get requested to
@@ -402,7 +411,7 @@ abstract class DatabaseClass extends DatabaseMetaClass {
 
 
     /**
-     * @return DatabaseSchema
+     * @return DatabaseSchema|false
      * @throws MWException
      */
     public static function getSchema() {
@@ -1658,8 +1667,6 @@ abstract class DatabaseClass extends DatabaseMetaClass {
                                 $permissionsResult = $relatedObject->hasRight( static::ACTION_EDIT );
 
                                 if( !$permissionsResult->isOK() ) {
-                                    static::log( 'debug', "Loading " . static::class . " object with cache key: " . $key );
-
                                     return $permissionsResult;
                                 }
                             }
