@@ -56,6 +56,7 @@ class DatabaseProperty extends DatabaseMetaClass {
     protected static $validTypes = [
         DatabaseClass::TYPE_ARRAY,
         DatabaseClass::TYPE_BOOLEAN,
+        DatabaseClass::TYPE_COLOR,
         DatabaseClass::TYPE_DOUBLE,
         DatabaseClass::TYPE_INTEGER,
         DatabaseClass::TYPE_JSON,

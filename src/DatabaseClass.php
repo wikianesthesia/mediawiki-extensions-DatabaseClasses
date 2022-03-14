@@ -41,6 +41,7 @@ abstract class DatabaseClass extends DatabaseMetaClass {
 
     public const TYPE_ARRAY = 'array';
     public const TYPE_BOOLEAN = 'boolean';
+    public const TYPE_COLOR = 'color';
     public const TYPE_DOUBLE = 'double';
     public const TYPE_INTEGER = 'integer';
     public const TYPE_JSON = 'json';

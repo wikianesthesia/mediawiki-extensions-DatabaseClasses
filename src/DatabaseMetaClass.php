@@ -9,7 +9,6 @@ namespace DatabaseClasses;
 
 use MWException;
 use MediaWiki\Logger\LoggerFactory;
-use PracticeGroups\PracticeGroup;
 use Status;
 
 /**
@@ -191,6 +190,13 @@ abstract class DatabaseMetaClass {
 
             if( $propertyType === DatabaseClass::TYPE_ARRAY ) {
                 if( !is_array( $value ) ) {
+                    $typeMismatch = true;
+                }
+            } elseif( $propertyType === DatabaseClass::TYPE_COLOR ) {
+                // Currently only supports 3 or 6 digit hex colors with preceding '#'
+                $regexpColor = '/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/';
+
+                if( $value && !preg_match( $regexpColor, $value ) ) {
                     $typeMismatch = true;
                 }
             } elseif( $propertyType === DatabaseClass::TYPE_OBJECT ) {
