@@ -5,7 +5,7 @@
     "Chris Rishel"
   ],
   "license-name": "GPL-3.0-or-later",
-  "url": "https://www.mediawiki.org/wiki/Extension:VEPageTemplates",
+  "url": "https://github.com/wikianesthesia/mediawiki-extensions-DatabaseClasses",
   "descriptionmsg": "databaseclasses-desc",
   "type": "other",
   "requires": {
