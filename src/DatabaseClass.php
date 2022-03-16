@@ -1079,10 +1079,13 @@ abstract class DatabaseClass extends DatabaseMetaClass {
         # Check permissions
         $action = static::ACTION_DELETE;
 
+        $result->setResult( true, [ 'action' => $action ] );
+
         $permissionsResult = $this->hasRight( $action );
 
         if( !$permissionsResult->isOK() ) {
-            return $permissionsResult;
+            $result->merge( $permissionsResult );
+            return $result;
         }
 
         if( !$this->isPrimaryKeySet() ) {
@@ -1161,7 +1164,8 @@ abstract class DatabaseClass extends DatabaseMetaClass {
                     try {
                         $dbw->selectRow( $junctionTableName, $this->getPrimaryKeyFields(), '*' );
                     } catch( MWException $e ) {
-                        return Status::newFatal( $e->getMessage() );
+                        $result->fatal( $e->getMessage() );
+                        return $result;
                     }
 
                     $relatedJunctionTables[] = $junctionTableName;
@@ -1185,20 +1189,27 @@ abstract class DatabaseClass extends DatabaseMetaClass {
                     foreach( $relatedObjects as $relatedObject ) {
                         if( $relatedPropertyRequired ) {
                             # Only test deletion here
-                            $result = $relatedObject->delete( true );
+                            $deleteResult = $relatedObject->delete( true );
+
+                            if( !$deleteResult->isOK() ) {
+                                $result->merge( $deleteResult );
+                                return $result;
+                            }
                         } else {
                             $setValueResult = $relatedObject->setValue( $relatedPropertyName, null );
 
                             if( !$setValueResult->isOK() ) {
-                                return $setValueResult;
+                                $result->merge( $setValueResult );
+                                return $result;
                             }
 
                             # Only test saving here
-                            $result = $relatedObject->save( true );
-                        }
+                            $saveResult = $relatedObject->save( true );
 
-                        if( !$result->isOK() ) {
-                            return $result;
+                            if( !$saveResult->isOK() ) {
+                                $result->merge( $saveResult );
+                                return $result;
+                            }
                         }
                     }
                 }
@@ -1226,18 +1237,20 @@ abstract class DatabaseClass extends DatabaseMetaClass {
 
         # Delete related objects
         foreach( $relatedObjectsToDelete as $relatedObject ) {
-            $result = $relatedObject->delete( $test );
+            $deleteResult = $relatedObject->delete( $test );
 
-            if( !$result->isOK() ) {
+            if( !$deleteResult->isOK() ) {
+                $result->merge( $deleteResult );
                 return $result;
             }
         }
 
         # Update related objects
         foreach( $relatedObjectsToEdit as $relatedObject ) {
-            $result = $relatedObject->save( $test );
+            $saveResult = $relatedObject->save( $test );
 
-            if( !$result->isOK() ) {
+            if( !$saveResult->isOK() ) {
+                $result->merge( $saveResult );
                 return $result;
             }
         }
@@ -1382,10 +1395,13 @@ abstract class DatabaseClass extends DatabaseMetaClass {
             $action = static::ACTION_EDIT;
         }
 
+        $result->setResult( true, [ 'action' => $action ] );
+
         $permissionsResult = $this->hasRight( $action );
 
         if( !$permissionsResult->isOK() ) {
-            return $permissionsResult;
+            $result->merge( $permissionsResult->getStatusValue() );
+            return $result;
         }
 
         # Make sure all required fields are defined to a valid value
@@ -1477,7 +1493,8 @@ abstract class DatabaseClass extends DatabaseMetaClass {
                         $setValueResult = $this->setValue( $primaryKeyFieldName, $newIdValue );
 
                         if( !$setValueResult->isOK() ) {
-                            return $setValueResult;
+                            $result->merge( $setValueResult );
+                            return $result;
                         }
 
                         # If just testing, revert to the original value
@@ -1612,7 +1629,8 @@ abstract class DatabaseClass extends DatabaseMetaClass {
                         try {
                             $dbw->selectRow( $junctionTableName, $this->getPrimaryKeyFields(), '*' );
                         } catch( MWException $e ) {
-                            return Status::newFatal( $e->getMessage() );
+                            $result->fatal( $e->getMessage() );
+                            return $result;
                         }
 
                         if( !$test ) {
@@ -1654,12 +1672,14 @@ abstract class DatabaseClass extends DatabaseMetaClass {
                                 $setValueResult = $relatedObject->setValues( $newValues );
 
                                 if( !$setValueResult->isOK() ) {
-                                    return $setValueResult;
+                                    $result->merge( $setValueResult );
+                                    return $result;
                                 }
 
-                                $result = $relatedObject->save( $test );
+                                $saveResult = $relatedObject->save( $test );
 
-                                if( !$result->isOK() ) {
+                                if( !$saveResult->isOK() ) {
+                                    $result->merge( $saveResult );
                                     return $result;
                                 }
                             } else {
@@ -1668,7 +1688,8 @@ abstract class DatabaseClass extends DatabaseMetaClass {
                                 $permissionsResult = $relatedObject->hasRight( static::ACTION_EDIT );
 
                                 if( !$permissionsResult->isOK() ) {
-                                    return $permissionsResult;
+                                    $result->merge( $permissionsResult );
+                                    return $result;
                                 }
                             }
                         }
